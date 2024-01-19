@@ -1,0 +1,25 @@
+class Transform:
+    def __init__(self):
+        pass
+
+    def __call__(self, image, mask):
+        # Convertir la imagen a un tipo de datos flotante
+        image = image.astype(np.float32)
+
+        # Normalizar la imagen al rango [0, 1]
+        image /= 65535.0
+        
+        # Aplicar filtro gaussiano para eliminar ruido
+        image = filters.gaussian(image, sigma=1)
+
+        # Ecualizar el histograma para mejorar el contraste
+        image = exposure.equalize_adapthist(image, clip_limit=0.03)
+
+        # mascaras entre [0, 1]
+        mask = mask.astype(np.float32) / 65535.0
+
+        # Convertir las imágenes a tensores
+        image = TF.to_tensor(image)
+        mask = TF.to_tensor(mask)
+
+        return image, mask
