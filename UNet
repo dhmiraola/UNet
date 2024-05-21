@@ -1,0 +1,78 @@
+# UNet
+class UNet(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(UNet, self).__init__()
+
+        # codificador
+        self.encoder1 = self._block(in_channels, 32)
+        self.encoder2 = self._block(32, 64)
+        self.encoder3 = self._block(64, 128)
+        self.encoder4 = self._block(128, 256)
+        self.encoder5 = self._block(256, 512)
+        self.encoder6 = self._block(512, 1024)
+        self.encoder7 = self._block(1024, 2048)  
+
+        # decodificador
+        self.upconv7 = nn.ConvTranspose2d(2048, 1024, kernel_size=2, stride=2)  
+        self.decoder7 = self._block(2048, 1024)  
+        self.upconv6 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
+        self.decoder6 = self._block(1024, 512)
+        self.upconv5 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.decoder5 = self._block(512, 256)
+        self.upconv4 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.decoder4 = self._block(256, 128)
+        self.upconv3 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.decoder3 = self._block(128, 64)
+        self.upconv2 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
+        self.decoder2 = self._block(64, 32)
+        self.decoder1 = self._block(32, out_channels, final_layer=True)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+    def _block(self, in_channels, features, final_layer=False):
+        layers = [
+            nn.Conv2d(in_channels, features, kernel_size=3, padding=1),
+            nn.BatchNorm2d(features),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(features, features, kernel_size=3, padding=1),
+            nn.BatchNorm2d(features),
+            nn.ReLU(inplace=True)
+        ]
+        if final_layer:
+            layers.append(nn.Conv2d(features, out_channels, kernel_size=1))
+            layers.append(nn.Sigmoid())
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        
+        # Codificador
+        enc1 = self.encoder1(x)
+        enc2 = self.encoder2(self.pool(enc1))
+        enc3 = self.encoder3(self.pool(enc2))
+        enc4 = self.encoder4(self.pool(enc3))
+        enc5 = self.encoder5(self.pool(enc4))
+        enc6 = self.encoder6(self.pool(enc5))
+        enc7 = self.encoder7(self.pool(enc6))  
+        
+        # Decodificador
+        dec7 = self.upconv7(enc7)
+        dec7 = torch.cat((dec7, enc6), dim=1)
+        dec7 = self.decoder7(dec7)
+        dec6 = self.upconv6(dec7)
+        dec6 = torch.cat((dec6, enc5), dim=1)
+        dec6 = self.decoder6(dec6)
+        dec5 = self.upconv5(dec6)
+        dec5 = torch.cat((dec5, enc4), dim=1)
+        dec5 = self.decoder5(dec5)
+        dec4 = self.upconv4(dec5)
+        dec4 = torch.cat((dec4, enc3), dim=1)
+        dec4 = self.decoder4(dec4)
+        dec3 = self.upconv3(dec4)
+        dec3 = torch.cat((dec3, enc2), dim=1)
+        dec3 = self.decoder3(dec3)
+        dec2 = self.upconv2(dec3)
+        dec2 = torch.cat((dec2, enc1), dim=1)
+        dec2 = self.decoder2(dec2)
+        dec1 = self.decoder1(dec2)
+        
+        return dec1
+
